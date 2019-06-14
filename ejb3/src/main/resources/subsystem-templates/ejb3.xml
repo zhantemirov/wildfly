@@ -44,6 +44,9 @@
        <server-interceptors>
            <server-interceptor module="foo:interceptors:1.0" class="org.bar.FooInterceptor"/>
        </server-interceptors>
+       <client-interceptors>
+           <client-interceptor module="foo:interceptors:1.0" class="org.bar.FooInterceptor"/>
+       </client-interceptors>
        <?IIOP?>
        <default-security-domain value="other"/>
        <default-missing-method-permissions-deny-access value="true" />
