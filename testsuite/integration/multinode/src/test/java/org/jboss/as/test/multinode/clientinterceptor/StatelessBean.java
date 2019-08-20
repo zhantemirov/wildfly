@@ -22,9 +22,14 @@
 
 package org.jboss.as.test.multinode.clientinterceptor;
 
+import java.rmi.RemoteException;
 import org.jboss.logging.Logger;
 
+import javax.ejb.EJBHome;
+import javax.ejb.EJBObject;
+import javax.ejb.Handle;
 import javax.ejb.Remote;
+import javax.ejb.RemoveException;
 import javax.ejb.Stateless;
 
 /**
@@ -33,7 +38,7 @@ import javax.ejb.Stateless;
 
 @Stateless
 @Remote(StatelessRemote.class)
-public class StatelessBean {
+public class StatelessBean implements StatelessRemote {
     private static final Logger log = Logger.getLogger(StatelessBean.class);
 
     private static int methodCount = 0;
@@ -44,5 +49,28 @@ public class StatelessBean {
         return methodCount;
     }
 
+    @Override
+    public EJBHome getEJBHome() throws RemoteException {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
 
+    @Override
+    public Object getPrimaryKey() throws RemoteException {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public void remove() throws RemoteException, RemoveException {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public Handle getHandle() throws RemoteException {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public boolean isIdentical(EJBObject ejbo) throws RemoteException {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
 }
