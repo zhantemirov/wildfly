@@ -25,6 +25,8 @@
         <jbossas.ts.integ.dir>${basedir}/..</jbossas.ts.integ.dir>
         <jbossas.ts.dir>${jbossas.ts.integ.dir}/..</jbossas.ts.dir>
         <jbossas.project.dir>${jbossas.ts.dir}/..</jbossas.project.dir>
+        <version.org.jboss.byteman>4.0.6</version.org.jboss.byteman>
+        <test-group>org/jboss/as/test/manualmode/</test-group>
     </properties>
 
     <dependencies>
@@ -131,6 +133,35 @@
             <artifactId>jboss-jaxws-api_2.3_spec</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- ARQ extension for Byteman -->
+        <dependency>
+            <groupId>org.jboss.arquillian.extension</groupId>
+            <artifactId>arquillian-extension-byteman</artifactId>
+            <version>1.1.0</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.sun</groupId>
+                    <artifactId>tools</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- Byteman dependencies -->
+        <dependency>
+            <groupId>org.jboss.byteman</groupId>
+            <artifactId>byteman</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jboss.byteman</groupId>
+            <artifactId>byteman-submit</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jboss</groupId>
+            <artifactId>jboss-ejb-client</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <profiles>
@@ -222,19 +253,27 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
-
+                            <argLine>${surefire.byteman.argline}</argLine>
                             <!-- Workaround for nasty and hacky tests not cleaning up completely after themselves. -->
                             <reuseForks>false</reuseForks>
+                            <!-- Needed for EJB client tests -->
+                            <useSystemClassLoader>true</useSystemClassLoader>
+                            <useManifestOnlyJar>true</useManifestOnlyJar>
+                            <forkMode>once</forkMode>
 
                             <environmentVariables>
                                 <JBOSS_HOME>${wildfly.dir}</JBOSS_HOME>
+                                <BYTEMAN_HOME/>
                             </environmentVariables>
+                            <includes>
+                                <include>${test-group}/**/byteman/*TestCase.java</include>
+                            </includes>
 
                             <!-- Parameters to test cases. -->
                             <systemPropertyVariables combine.children="append">
                                 <!--<management.address>${node0}</management.address>-->
                                 <jvm.args>${jvm.args.ip.server} ${modular.jdk.args} -Dmaven.repo.local=${settings.localRepository}</jvm.args>
-                                <server.jvm2.args>${surefire.system.args} ${jvm.args.ip} -Djboss.bind.address=${node1} -Djboss.bind.address.management=${node1} -Djboss.bind.address.unsecure=${node1} -Dnode0=${node0} -Dnode1=${node1} ${modular.jdk.args}</server.jvm2.args>
+                                <server.jvm2.args>${surefire.system.args} ${jvm.args.ip} ${surefire.byteman.args} -Djboss.bind.address=${node1} -Djboss.bind.address.management=${node1} -Djboss.bind.address.unsecure=${node1} -Dnode0=${node0} -Dnode1=${node1} ${modular.jdk.args}</server.jvm2.args>
                                 <arquillian.launch>manual-mode</arquillian.launch>
                                 <jboss.server.config.file.name>standalone-ha.xml</jboss.server.config.file.name>
                                 <!-- needed for SSLEJBRemoteClientTestCase only, however setting them from within the test itself isn't possible -->

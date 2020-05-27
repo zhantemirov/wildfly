@@ -20,7 +20,7 @@
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
 
-package org.jboss.as.test.manualmode.ejb.client.outbound.connection.server2server.overhttp;
+package org.jboss.as.test.manualmode.ejb.client.outbound.connection.ejboverhttp.byteman;
 
 public interface StatelessLocal extends javax.ejb.EJBLocalObject {
     int method() throws Exception;

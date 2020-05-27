@@ -282,4 +282,9 @@
         </container>
     </group>
 
+    <extension qualifier="byteman">
+        <property name="autoInstallAgent">true</property>
+        <property name="agentProperties">org.jboss.byteman.verbose=true,prop:org.jboss.byteman.debug=true</property>
+    </extension>
+
 </arquillian>

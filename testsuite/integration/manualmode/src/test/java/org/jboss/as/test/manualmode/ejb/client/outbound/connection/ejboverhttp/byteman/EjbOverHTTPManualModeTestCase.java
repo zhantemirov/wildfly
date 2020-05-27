@@ -1,4 +1,4 @@
-package org.jboss.as.test.manualmode.ejb.client.outbound.connection.server2server.overhttp;
+package org.jboss.as.test.manualmode.ejb.client.outbound.connection.ejboverhttp.byteman;
 
 
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD;
@@ -11,6 +11,7 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUB
 import static org.jboss.as.test.shared.integration.ejb.security.PermissionUtils.createFilePermission;
 import static org.jboss.as.test.shared.integration.ejb.security.PermissionUtils.createPermissionsXmlAsset;
 import java.net.InetAddress;
+import java.rmi.NoSuchObjectException;
 import java.util.Arrays;
 import java.util.Properties;
 import javax.naming.Context;
@@ -21,6 +22,7 @@ import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.container.test.api.OperateOnDeployment;
 import org.jboss.arquillian.container.test.api.RunAsClient;
 import org.jboss.arquillian.container.test.api.TargetsContainer;
+import org.jboss.arquillian.extension.byteman.api.BMRule;
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.arquillian.test.api.ArquillianResource;
 import org.jboss.as.controller.client.ModelControllerClient;
@@ -137,8 +139,17 @@ public class EjbOverHTTPManualModeTestCase {
     @After
     public void teardown() throws Exception {
         try {
-            this.deployer.undeploy(DEFAULT_AS_DEPLOYMENT);
-            this.deployer.undeploy(DEPLOYMENT_WITH_JBOSS_EJB_CLIENT_XML);
+            try {
+                this.deployer.undeploy(DEFAULT_AS_DEPLOYMENT);
+            } catch (Exception e) {
+                // ignore
+            }
+
+            try {
+                this.deployer.undeploy(DEPLOYMENT_WITH_JBOSS_EJB_CLIENT_XML);
+            } catch (Exception e) {
+                // ignore
+            }
 
             ModelNode op = new ModelNode();
             op.get(OP).set(REMOVE);
@@ -153,9 +164,12 @@ public class EjbOverHTTPManualModeTestCase {
         }
     }
 
-    @Test
+    @Test(expected = RuntimeException.class)
+    @BMRule(
+            name = "Throw exception on success", targetClass = "HttpEJBDiscoveryProvider", targetMethod = "discover",
+            action = "throw new java.lang.RuntimeException()")
     @OperateOnDeployment(DEPLOYMENT_WITH_JBOSS_EJB_CLIENT_XML)
-    public void testRemoteServerStartsLate() throws Exception {
+    public void testProcessMissingTarget() throws Exception {
 
         Properties props = new Properties();
         props.put(Context.INITIAL_CONTEXT_FACTORY, WildFlyInitialContextFactory.class.getName());
@@ -168,5 +182,12 @@ public class EjbOverHTTPManualModeTestCase {
         int methodCount = bean.remoteCall();
         Assert.assertEquals(1, methodCount);
 
+        this.deployer.undeploy(DEFAULT_AS_DEPLOYMENT);
+
+        try {
+            int result = bean.remoteCall();
+        } catch (NoSuchObjectException e) {
+            //expected
+        }
     }
 }
