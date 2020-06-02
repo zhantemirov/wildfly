@@ -10,12 +10,14 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REM
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUBSYSTEM;
 import static org.jboss.as.test.shared.integration.ejb.security.PermissionUtils.createFilePermission;
 import static org.jboss.as.test.shared.integration.ejb.security.PermissionUtils.createPermissionsXmlAsset;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
-import java.rmi.NoSuchObjectException;
 import java.util.Arrays;
 import java.util.Properties;
+import javax.ejb.NoSuchEJBException;
 import javax.naming.Context;
-import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import org.jboss.arquillian.container.test.api.ContainerController;
 import org.jboss.arquillian.container.test.api.Deployer;
 import org.jboss.arquillian.container.test.api.Deployment;
@@ -23,10 +25,14 @@ import org.jboss.arquillian.container.test.api.OperateOnDeployment;
 import org.jboss.arquillian.container.test.api.RunAsClient;
 import org.jboss.arquillian.container.test.api.TargetsContainer;
 import org.jboss.arquillian.extension.byteman.api.BMRule;
+import org.jboss.arquillian.extension.byteman.api.BMRules;
+import org.jboss.arquillian.extension.byteman.api.ExecType;
 import org.jboss.arquillian.junit.Arquillian;
+import org.jboss.arquillian.junit.InSequence;
 import org.jboss.arquillian.test.api.ArquillianResource;
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.OperationBuilder;
+import org.jboss.as.test.manualmode.ejb.Util;
 import org.jboss.as.test.shared.TestSuiteEnvironment;
 import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
@@ -63,6 +69,8 @@ public class EjbOverHTTPManualModeTestCase {
     @ArquillianResource
     private Deployer deployer;
 
+    private Context context;
+
     @Deployment(name = DEFAULT_AS_DEPLOYMENT, managed = false, testable = false)
     @TargetsContainer(SERVER_CONTAINER)
     public static Archive<?> createContainer1Deployment() {
@@ -95,6 +103,10 @@ public class EjbOverHTTPManualModeTestCase {
 
     @Before
     public void setup() throws Exception {
+
+        final Properties ejbClientProperties = setupEJBClientProperties();
+        this.context = Util.createNamingContext(ejbClientProperties);
+
         this.container.start(CLIENT_CONTAINER);
 
         client = ModelControllerClient.Factory.create(
@@ -157,37 +169,70 @@ public class EjbOverHTTPManualModeTestCase {
             op.get(OP_ADDR).add("remoting-profile", "test-profile");
             client.execute(new OperationBuilder(op).build());
 
-            this.container.stop(SERVER_CONTAINER);
+            try {
+                this.container.stop(SERVER_CONTAINER);
+            } catch (Exception e) {
+                // ignore
+            }
             this.container.stop(CLIENT_CONTAINER);
         } catch (Exception e) {
             logger.debug("Exception during container shutdown", e);
         }
+
+        this.context.close();
     }
 
-    @Test(expected = RuntimeException.class)
-    @BMRule(
-            name = "Throw exception on success", targetClass = "HttpEJBDiscoveryProvider", targetMethod = "discover",
-            action = "throw new java.lang.RuntimeException()")
+    @Test
+    @InSequence(0)
     @OperateOnDeployment(DEPLOYMENT_WITH_JBOSS_EJB_CLIENT_XML)
-    public void testProcessMissingTarget() throws Exception {
+    public void testInvocation() throws Exception {
 
-        Properties props = new Properties();
-        props.put(Context.INITIAL_CONTEXT_FACTORY, WildFlyInitialContextFactory.class.getName());
-
-        InitialContext jndiContext = new InitialContext(props);
-        StatelessRemote bean = (StatelessRemote) jndiContext.lookup("ejb:/" + ARCHIVE_NAME_CLIENT
+        StatelessRemote bean = (StatelessRemote) context.lookup("ejb:/" + ARCHIVE_NAME_CLIENT
                 + "//" + StatelessBean.class.getSimpleName() + "!" + StatelessRemote.class.getName());
 
         Assert.assertNotNull(bean);
         int methodCount = bean.remoteCall();
         Assert.assertEquals(1, methodCount);
 
+
+    }
+
+
+    @Test(expected = IllegalArgumentException.class)
+    @InSequence(1)
+    @BMRule(
+            name = "Throw exception on success", targetClass = "HttpEJBDiscoveryProvider", targetMethod = "processMissingTarget",
+            action = "throw new java.lang.RuntimeException()")
+    @OperateOnDeployment(DEPLOYMENT_WITH_JBOSS_EJB_CLIENT_XML)
+    public void testProcessMissingTarget() throws Exception {
+
         this.deployer.undeploy(DEFAULT_AS_DEPLOYMENT);
 
-        try {
-            int result = bean.remoteCall();
-        } catch (NoSuchObjectException e) {
-            //expected
+        StatelessRemote bean = (StatelessRemote) context.lookup("ejb:/" + ARCHIVE_NAME_CLIENT
+                + "//" + StatelessBean.class.getSimpleName() + "!" + StatelessRemote.class.getName());
+
+        int result = bean.remoteCall();
+        Assert.assertEquals(-1, result);
+
+    }
+
+
+    /**
+     * Sets up the EJB client properties based on this testcase specific jboss-ejb-client.properties file
+     *
+     * @return
+     * @throws java.io.IOException
+     */
+    private static Properties setupEJBClientProperties() throws IOException {
+        // setup the properties
+        final String clientPropertiesFile = "org/jboss/as/test/manualmode/ejb/client/outbound/connection/ejboverhttp/byteman/jboss-ejb-client.properties";
+        final InputStream inputStream = EjbOverHTTPManualModeTestCase.class.getClassLoader().getResourceAsStream(clientPropertiesFile);
+        if (inputStream == null) {
+            throw new IllegalStateException("Could not find " + clientPropertiesFile + " in classpath");
         }
+        final Properties properties = new Properties();
+        properties.put(Context.INITIAL_CONTEXT_FACTORY, WildFlyInitialContextFactory.class.getName());
+        properties.load(inputStream);
+        return properties;
     }
 }

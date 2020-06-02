@@ -24,6 +24,7 @@ package org.jboss.as.test.manualmode.ejb.client.outbound.connection.ejboverhttp.
 
 import java.util.Properties;
 import javax.ejb.Local;
+import javax.ejb.NoSuchEJBException;
 import javax.ejb.Remote;
 import javax.ejb.Stateless;
 import javax.naming.Context;
@@ -52,7 +53,12 @@ public class StatelessBean {
         log.trace("Calling Remote... " + jndiContext.getEnvironment());
         StatelessRemote stateless = (StatelessRemote) jndiContext.lookup("ejb:/" + EjbOverHTTPManualModeTestCase.ARCHIVE_NAME_SERVER
                 + "//" + StatelessBean.class.getSimpleName() + "!" + StatelessRemote.class.getName());
-        return stateless.method();
+        try {
+            return stateless.method();
+        } catch (NoSuchEJBException e) {
+            return -1;
+        }
+
     }
 
     public int method() throws Exception {
