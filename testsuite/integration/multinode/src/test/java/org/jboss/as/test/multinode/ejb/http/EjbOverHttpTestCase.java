@@ -22,6 +22,7 @@
 
 package org.jboss.as.test.multinode.ejb.http;
 
+import org.jboss.arquillian.container.test.api.Deployer;
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.container.test.api.OperateOnDeployment;
 import org.jboss.arquillian.container.test.api.TargetsContainer;
@@ -113,7 +114,10 @@ public class EjbOverHttpTestCase {
         log.trace("System properties:\n" + System.getProperties());
     }
 
-    @Deployment(name = "server")
+    @ArquillianResource
+    private Deployer deployer;
+
+    @Deployment(name = "server", managed = false)
     @TargetsContainer("multinode-server")
     public static Archive<?> deployment0() {
         JavaArchive jar = createJar(ARCHIVE_NAME_SERVER);
@@ -144,11 +148,19 @@ public class EjbOverHttpTestCase {
     @Test
     @OperateOnDeployment("client")
     public void testBasicInvocation(@ArquillianResource InitialContext ctx) throws Exception {
+
+        deployer.deploy("server");
+
         StatelessRemote bean = (StatelessRemote) ctx.lookup("java:module/" + StatelessBean.class.getSimpleName() + "!"
                 + StatelessRemote.class.getName());
         Assert.assertNotNull(bean);
 
         int methodCount = bean.remoteCall();
         Assert.assertEquals(1, methodCount);
+
+        deployer.undeploy("server");
+
+        int result = bean.remoteCall();
+        Assert.assertEquals(-1, result);
     }
 }
